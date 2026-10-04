@@ -37,7 +37,7 @@ order. All of that is your design - nothing here prescribes it.
 
 
 class Value:
-    def __init__(self, data):
+    def __init__(self, data,children=(),op=''):
         """
         Wrap a plain number in a Value. .grad starts at 0 - this
         Value hasn't received any gradient yet, and won't, unless
@@ -46,6 +46,8 @@ class Value:
         """
         self.data = data
         self.grad = 0
+        self.children=children
+        self.op=op
 
     def __add__(self, other):
         """
@@ -53,14 +55,26 @@ class Value:
         graph (remember self and other as this new Value's children)
         so backward() can later find its way back to them.
         """
-        raise NotImplementedError
+        return Value(self.data+other.data,children=(self,other),op='+')
 
     def __mul__(self, other):
         """
         Return a NEW Value representing self * other. Same graph-
         building requirement as __add__.
         """
-        raise NotImplementedError
+        return Value(self.data * other.data, children=(self, other), op='*')
+
+    def build_topo_order(node, visited=None, order=None):
+        if visited is None:
+            visited = set()
+        if order is None:
+            order = []
+        if node not in visited:
+            visited.add(node)
+            for child in node.children:
+                Value.build_topo_order(child, visited, order)
+            order.append(node)
+        return order
 
     def backward(self):
         """
@@ -70,4 +84,17 @@ class Value:
         to itself). Must accumulate contributions (+=), never
         overwrite, for any Value used in more than one place.
         """
-        raise NotImplementedError
+        topo = Value.build_topo_order(self)
+        self.grad = 1
+
+        for node in reversed(topo):
+            if node.op == '+':
+                node.children[0].grad += node.grad
+                node.children[1].grad += node.grad
+            elif node.op == '*':
+                a, b = node.children
+                a.grad += b.data * node.grad
+                b.grad += a.data * node.grad
+
+        
+        

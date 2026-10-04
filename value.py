@@ -35,7 +35,7 @@ backward() reaches it, and how you build the reverse-topological
 order. All of that is your design - nothing here prescribes it.
 """
 
-
+import math
 class Value:
     def __init__(self, data,children=(),op=''):
         """
@@ -63,6 +63,50 @@ class Value:
         building requirement as __add__.
         """
         return Value(self.data * other.data, children=(self, other), op='*')
+
+    def tanh(self):
+        """
+        Return a NEW Value representing tanh(self.data). Unary op -
+        one child, not two, so backward()'s dispatch needs a case
+        that only unpacks one child instead of two.
+        Local derivative: d(tanh(x))/dx = 1 - tanh(x)^2 - cheap to
+        compute since the output Value's own .data already IS
+        tanh(x), no need to recompute it.
+        """
+        return Value(math.tanh(self.data),children=(self,),op='tanh')
+
+    def exp(self):
+        """
+        Return a NEW Value representing e^(self.data). Unary op.
+        Local derivative: d(exp(x))/dx = exp(x) - the output is its
+        own derivative, so again no extra computation needed beyond
+        what's already stored in .data.
+        """
+        return Value(math.exp(self.data),children=(self,),op='exp')
+
+    def log(self):
+        """
+        Return a NEW Value representing the natural log of
+        self.data. Unary op.
+        Local derivative: d(log(x))/dx = 1/x = 1/self.data.
+        """
+        return Value(math.log(self.data),children=(self,),op='log')
+
+    def __pow__(self, k):
+        """
+        Return a NEW Value representing self.data ** k, where k is a
+        plain number (int or float), NOT a Value - the exponent
+        itself isn't a trainable parameter here, so it doesn't need
+        its own graph node. Still unary (one child: self).
+        Local derivative: d(x^k)/dx = k * x^(k-1).
+        You'll need to remember k somewhere on the new Value so
+        backward() can use it later when it reaches this node -
+        where exactly is your call, same as everything else so far.
+        This is what gives you division for free later: a * b**-1.
+        """
+        out=Value(self.data**k, (self,),'pow')
+        out.k=k
+        return out 
 
     def build_topo_order(node, visited=None, order=None):
         if visited is None:
@@ -95,6 +139,17 @@ class Value:
                 a, b = node.children
                 a.grad += b.data * node.grad
                 b.grad += a.data * node.grad
-
+            elif node.op == 'tanh':
+                child=node.children[0]
+                child.grad+=(1-node.data**2)*node.grad
+            elif node.op== 'exp':
+                node.children[0].grad += node.data*node.grad
+            elif node.op=='log':
+                child=node.children[0]
+                child.grad += (1/child.data)*node.grad if child.data !=0 else (1/child.data+0.0001)*node.grad
+            elif node.op=='pow':
+                child=node.children[0]
+                child.grad += (node.k * (child.data)**(node.k-1))*node.grad
         
         
+1

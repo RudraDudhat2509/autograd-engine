@@ -20,7 +20,7 @@ framework is built on top of.
 Scaffold + test suite in place (`value.py`, `test_value.py`).
 Implementation in progress.
 
-## Usage (once implemented)
+## Usage
 
 ```python
 from value import Value
@@ -29,6 +29,9 @@ a, b, c = Value(2), Value(-3), Value(10)
 d = a * b + c
 d.backward()
 print(d.data, a.grad, b.grad, c.grad)  # 4 -3 2 1
+
+# also supports tanh, exp, log, and pow (division = a * b**-1)
+x = Value(2).tanh()
 ```
 
 ## Running tests

@@ -9,6 +9,8 @@ answer is.
 
 Run with: pytest test_value.py -v
 """
+import math
+import pytest
 from value import Value
 
 
@@ -62,3 +64,45 @@ def test_backward_accumulates_when_reused():
     assert a.grad == 2
     assert b.grad == 3
     assert c.grad == 3
+
+
+def test_tanh_forward():
+    assert Value(0).tanh().data == pytest.approx(0)
+
+
+def test_exp_forward():
+    assert Value(0).exp().data == pytest.approx(1)
+
+
+def test_log_forward():
+    assert Value(1).log().data == pytest.approx(0)
+
+
+def test_pow_forward():
+    assert (Value(2) ** 3).data == 8
+
+
+def test_tanh_backward():
+    """x=2, y=tanh(x). Local derivative 1-tanh(x)^2 - verified against
+    Python's own math.tanh, not hand-rounded."""
+    x = Value(2)
+    y = x.tanh()
+    y.backward()
+
+    expected = 1 - math.tanh(2) ** 2
+    assert x.grad == pytest.approx(expected)
+
+
+def test_division_via_pow():
+    """
+    Division isn't its own op - it's multiplication by a pow(-1).
+    c = a * b**-1 = a / b = 6/3 = 2. Cross-checked by direct
+    differentiation: dc/da = 1/b = 1/3, dc/db = -a/b^2 = -6/9.
+    """
+    a, b = Value(6), Value(3)
+    c = a * (b ** -1)
+    c.backward()
+
+    assert c.data == pytest.approx(2)
+    assert a.grad == pytest.approx(1 / 3)
+    assert b.grad == pytest.approx(-6 / 9)
